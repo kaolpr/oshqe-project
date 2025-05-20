@@ -17,7 +17,12 @@ class Initialize(EnvExperiment):
             self.urukul0_ch0
         ]
         self.setattr_device("fastino0")
+        self.setattr_argument("message", StringValue("ABCAA"))
 
+    def prepare(self):
+        pulse_len = 2
+
+        letters = {'A': [1, 3], 'B': [3, 1, 1, 1], 'C': [3, 1, 3, 1]}
 
     @kernel
     def init(self):
@@ -36,7 +41,7 @@ class Initialize(EnvExperiment):
         self.fastino0.set_dac(dac=0, voltage=0*V)
 
     @kernel
-    def run_rt(self):
+    def run_rt(self, letter):
         self.init()
 
         # First setup Urukuls
@@ -50,12 +55,16 @@ class Initialize(EnvExperiment):
         self.ttl1.pulse(1 * us)
         self.ttl3.pulse(1 * us)
         # TODO: Add ttl5 input
-        self.fastino0.set_dac(dac=0, voltage=0.5*V)
-        delay(2 * us)
-        self.fastino0.set_dac(dac=0, voltage=0*V)
-        delay(1 * us)
+        for pulses in letter.values():
+            self.fastino0.set_dac(dac=0, voltage=0.5*V)
+            delay(pulse_len * pulses * us)
+            self.fastino0.set_dac(dac=0, voltage=0*V)
+            delay(pulse_len * us)
 
-    def run(self):        
+    def run(self): 
+        print(len(self.message))
+
+        self.set_dataset("error_rate", np.full(len(self.message), np.nan), broadcast=True, persist=True)       
         total_time = 0
         num_executions = 1
 
