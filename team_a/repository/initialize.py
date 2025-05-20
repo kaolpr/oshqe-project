@@ -1,5 +1,3 @@
-import time
-
 from artiq.experiment import *
 
 
@@ -7,86 +5,45 @@ class Initialize(EnvExperiment):
 
     def build(self):
         self.setattr_device("core")
-        self.setattr_device("core_dma")
-
-        self.setattr_device("ttl1")
-        self.setattr_device("ttl3")
-        self.setattr_device("urukul0_cpld")
-        self.setattr_device("urukul0_ch0")
+        self.setattr_device("ttl0")
+        self.urukul = self.get_device("urukul0_cpld")
         self.urukul_channels = [
-            self.urukul0_ch0
+            self.get_device(f"urukul0_ch0")
         ]
-        self.setattr_device("fastino0")
+    
+    def prepare(self):
+        envelope=np.array([])
+        for i in range (100):
+            envelope=np.append(envelope, np.exp(-i**2))
 
 
     @kernel
-    def init(self):
+    def run(self):  
+                # Reset our system after previous experiment
         self.core.reset()
 
-        self.urukul0_cpld.init()
-        for urukul_ch in self.urukul_channels:
-            urukul_ch.init()
-            urukul_ch.sw.off()
-            urukul_ch.set_att(31.5)
+        # Set software (now) counter in the future
+        self.core.break_realtime()
 
-        self.fastino0.init()
-        delay(8*ns)
-        self.fastino0.set_continuous(1)
-        delay(8*ns)
-        self.fastino0.set_dac(dac=0, voltage=0*V)
+        # Intialize Urukul and Urukul channels
+        # Note that, although output is disabled, the frequency is set to 25 MHz
+        # and DDS is running.
+        self.urukul.init()
+        delay(100*ms)
+        self.urukul_channels[0].init()
+        delay(1*ms)
+        self.urukul_channels[0].sw.off()
+        self.urukul_channels[0].set_att(0.0)
+        self.urukul_channels[0].set(frequency=25*MHz, phase=0.0, amplitude=1.0)
+        # Wait for channel to be fully operational
+        delay(10*ms)
 
-    @kernel
-    def run_rt(self):
-        self.init()
+        # SOLUTION -------------------------------------------------------------       
+        self.ttl0.pulse(100 * ns)
+        self.urukul_channels[0].sw.pulse(400 * ns)
+        
+        # self.urukul_channels[0].set_profile_ram(0, 100)
+        # self.core.break_realtime()
 
-        # First setup Urukuls
-        self.urukul0_ch0.set(frequency=1 * MHz)
-        self.urukul0_ch0.set_att(5.0)
-        self.urukul0_ch0.sw.on()
-
-        delay(1 * ms)
-
-        # Starting TTL sequence will trigger the scope
-        self.ttl1.pulse(1 * us)
-        self.ttl3.pulse(1 * us)
-        # TODO: Add ttl5 input
-        self.fastino0.set_dac(dac=0, voltage=0.5*V)
-        delay(2 * us)
-        self.fastino0.set_dac(dac=0, voltage=0*V)
-        delay(1 * us)
-
-    def run(self):        
-        total_time = 0
-        num_executions = 1
-
-        for _ in range(num_executions):
-            start_time = time.time()
-            
-            # Profile scope.setup()
-            setup_start = time.time()
-            setup_end = time.time()
-            setup_time = setup_end - setup_start
-            
-            # Profile run_rt()
-            run_rt_start = time.time()
-            self.run_rt()
-            run_rt_end = time.time()
-            run_rt_time = run_rt_end - run_rt_start
-            
-            # Profile scope.store_waveform()
-            store_start = time.time()
-            store_end = time.time()
-            store_time = store_end - store_start
-            
-            end_time = time.time()
-            loop_time = end_time - start_time
-            total_time += loop_time
-
-            print(f"Execution {_ + 1}:")
-            print(f"  scope.setup() time: {setup_time:.6f} seconds")
-            print(f"  run_rt() time: {run_rt_time:.6f} seconds")
-            print(f"  scope.store_waveform() time: {store_time:.6f} seconds")
-            print(f"  Total loop time: {loop_time:.6f} seconds")
-
-        average_time = total_time / num_executions
-        print(f"Average execution time: {average_time:.6f} seconds")
+        # self.urukul.set_profile(0)
+        # delay(100 * us)
