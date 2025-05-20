@@ -1,8 +1,6 @@
 import time
 
 from artiq.experiment import *
-from common import Scope
-from user import user_id
 
 
 class Initialize(EnvExperiment):
