@@ -11,8 +11,10 @@ class DrawXY(EnvExperiment):
         Amplitude = 2 * V
         sample_num = 48
         phase= numpy.pi/12
-        self.samples_x=[Amplitude * numpy.sin(2*numpy.pi*i / sample_num * 2 - phase) for i in range(sample_num)]
-        self.samples_y=[Amplitude * numpy.cos(2*numpy.pi*i / sample_num * 2) for i in range(sample_num)]
+        self.samples_x = numpy.array([1.,1.,1.,2.,1.,1.,1.])*V
+        self.samples_y = numpy.array([1.,1.,2.,3.,2.,1.,2.])*V
+        # self.samples_x=[Amplitude * numpy.sin(2*numpy.pi*i / sample_num * 2 - phase) for i in range(sample_num)]
+        # self.samples_y=[Amplitude * numpy.cos(2*numpy.pi*i / sample_num * 2) for i in range(sample_num)]
 
     @kernel
     def run(self):
@@ -64,4 +66,7 @@ class DrawXY(EnvExperiment):
             # Clean up even if RTIO Underflow happens
             delay(40*us)
             self.fastino.set_dac(dac=0, voltage=0.0*V)
+            delay(392*ns*1)
+            self.fastino.set_dac(dac=1, voltage=0.0*V)
+
 
