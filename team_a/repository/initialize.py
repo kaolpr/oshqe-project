@@ -22,12 +22,12 @@ class Initialize(EnvExperiment):
         )
         self.setattr_argument(
             f"Steps", EnumerationValue(
-                ["100", "200", "400", "500", "1000"],
+                ["10", "100", "200", "400", "500", "1000"],
                 default="100"
             )
         )
         self.setattr_argument(
-            f"Sample_length", EnumerationValue(
+            f"Envelope_length", EnumerationValue(
                 ["10", "100", "200", "400", "500", "1000"],
                 default="100"
             )
@@ -35,10 +35,10 @@ class Initialize(EnvExperiment):
 
     
     def prepare(self):
-        samples = {"100": 100, "200": 200, "400":400, "500":500, "1000":1000}
+        samples = {"10": 10, "100": 100, "200": 200, "400":400, "500":500, "1000":1000}
         self.steps = samples[self.Steps]
         samples = {"10": 10, "100": 100, "200": 200, "400":400, "500":500, "1000":1000}
-        self.sample_length = samples[self.Sample_length]
+        self.sample_length = samples[self.Envelope_length]
 
         amplitude_val = np.linspace(0, 1, self.sample_length//2)
         amplitude_val = np.append(amplitude_val, np.linspace(1, 0, self.sample_length//2))
@@ -77,7 +77,7 @@ class Initialize(EnvExperiment):
 
         self.urukul_channels[0].sw.on()
         self.urukul_channels[0].set_att(0.0)
-        self.urukul_channels[0].set(frequency=25*MHz, phase=0.0, amplitude=1.0)
+        self.urukul_channels[0].set(frequency=50*MHz, phase=0.0, amplitude=1.0)
         # Wait for channel to be fully operational
         delay(10*ms)
 
