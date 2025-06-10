@@ -16,26 +16,28 @@ class Initialize(EnvExperiment):
         self.setattr_device("ttl5")
         
         self.setattr_argument("message",
-                              StringValue("ABC123"),
+                              StringValue("Dlugosc fali wynosi 138 (nm)."),
                               tooltip="This is the message you want to send")
 
         self.setattr_argument("pulse_len_us",
-                              NumberValue(2e-6, unit="us", precision=4),tooltip="This is a number argument")
+                              NumberValue(2e-6, unit="us", precision=6),tooltip="This is a number argument")
         
         #self.setattr_argument("num_executions",
         #                   NumberValue(2, type='int', scale=1, precision=0), tooltip="Number of times you want to send the message")
         
-        self.num_executions = 2 #figure out how to int in dashboard
-        self.symbol_count=0
+        self.num_executions = 10 #figure out how to int in dashboard
+
+        #self.symbol_count=0
         
     def prepare(self):
+        self.message += " "
 
         #self.message = "ABC" 
         #self.num_executions = 1 #number of repetitions
         #self.pulse_len_us = 2 #pulse length in us
 
-        print(os.getcwd())
-        print(os.listdir("../../../.")) #figure out why path is incorrect
+        #print(os.getcwd())
+        #print(os.listdir("../../../.")) #figure out why path is incorrect
 
         with open("../../../morse_code.json", "r") as f: #reading json file as loading into self.morse_code
             self.morse_code = json.load(f)
@@ -50,7 +52,7 @@ class Initialize(EnvExperiment):
 
         duration = []
         self.message = self.message.lower() #ensures all lowercase letters, like in the morse code json file
-        self.message += " "
+        #self.message += " "
         for char in self.message:
 
             if char in self.morse_code:
@@ -83,10 +85,11 @@ class Initialize(EnvExperiment):
                 t = self.core.mu_to_seconds(tstmp - self.t0)*self.pulse_len_us*1e6
                 time_values_us.append(t)
 
-        print("timestamp-t0 [us]: ", " ".join([f"{tstmp:.2f}" for tstmp in time_values_us]))
-
+        #print("timestamp-t0 [us]: ", " ".join([f"{tstmp:.2f}" for tstmp in time_values_us]))
+        self.time_transmission_us = (time_values_us[-1]-time_values_us[0])
+        #print(f"sdsd = {round((time_values_us[-1]-time_values_us[0])/self.pulse_len_us)}")
         signal_units = [round((time_values_us[i+1]-time_values_us[i])/self.pulse_len_us) for i in range(len(time_values_us)-1)] 
-        print(f"sigmnalunits={signal_units}")
+        #print(f"sigmnalunits={signal_units}")
         symbols = ''
         decoded_message= ''
         for i, unit in enumerate(signal_units):
@@ -111,6 +114,7 @@ class Initialize(EnvExperiment):
 
     @kernel
     def run_rt(self):
+
         self.core.reset()
 
         self.ttl1.output()
@@ -122,6 +126,9 @@ class Initialize(EnvExperiment):
 
         # Sending encoded message
         for i in range(len(self.duration)):
+
+            if i%10==0:
+                self.core.break_realtime()
             if i % 2 == 0:
                 self.ttl1.pulse(self.duration[i]*us)
             else:
@@ -130,8 +137,9 @@ class Initialize(EnvExperiment):
 
         # Finding rising and falling edge timestamps
         at_mu(self.t0)
+        self.core.break_realtime()
 
-        gate_end_mu = self.ttl5.gate_both(len(self.duration)*5*self.pulse_len_us) #maximum duration assuming all characters are spaces - 5 pulse lens?
+        gate_end_mu = self.ttl5.gate_both(len(self.duration)*7*self.pulse_len_us) #maximum duration assuming all characters are spaces - 7 pulse lens?
         
         i = 0
         
@@ -148,6 +156,7 @@ class Initialize(EnvExperiment):
         total_time = 0
 
         list_speed = []
+        list_errors=[]
 
         for i in range(self.num_executions):
             start_time = time.time()
@@ -181,41 +190,43 @@ class Initialize(EnvExperiment):
                 else:
                     char_errors.append(1)
     
-            current_error_rate = sum(char_errors) / (len(decoded_message) + 1)
-
+            current_error_rate = sum(char_errors) / (len(self.message) -1)
+            list_errors.append(current_error_rate)
             
-            self.set_dataset("error_rate", np.full(self.num_executions, np.nan), broadcast = True)
-            for k in range(self.num_executions):
-                self.mutate_dataset("error_rate", k, current_error_rate)
-                time.sleep(0.5)
+            #self.set_dataset("error_rate", np.full(self.num_executions, np.nan), broadcast = True)
+            #for k in range(self.num_executions):
+            self.mutate_dataset("error_rate", i, current_error_rate)
+            #time.sleep(0.5)
 
 
             if run_rt_time > 0:
-                sps = self.symbol_count / run_rt_time
+                sps = (len(self.message) - 1) / self.time_transmission_us#*1e6#run_rt_time
             else:
                 sps = 0
             #self.set_dataset(f"symbols_per_second[{i}]", i, sps)  
 
-            #list_speed.append(sps)  # <-- dodajemy wynik do listy
-            #self.set_dataset(f"symbols_per_second[{i}]", sps)
+            list_speed.append(sps)  #dodajemy wynik do listy
+            self.mutate_dataset("speed_of_transmission", i, sps)
 
+            '''
             print(f"Execution {i + 1}:")
-            print(f"  scope.setup() time: {setup_time:.6f} seconds")
+            print(f"  scope.setup() time: {setup_time:.6f} seconds")'''
             print(f"  run_rt() time: {run_rt_time:.6f} seconds")
+            print(f"len mess: {len(self.message)}")
+            '''
             print(f"  scope.store_waveform() time: {store_time:.6f} seconds")
-            print(f"  Total loop time: {loop_time:.6f} seconds")
+            print(f"  Total loop time: {loop_time:.6f} seconds")'''
 
+            print(f"Original message: {self.message}")
+            print(f"Decoded message:  {decoded_message}")
     
         average_time = total_time / self.num_executions
         print(f"Average execution time: {average_time:.6f} seconds")
         print(self.duration)
 
-        print(f"Original message: {self.message}")
-        print(f"Decoded message:  {decoded_message}")
-
-        print(current_error_rate)
+        print(f"Worse error rate: {max(list_errors)}")
               
         #max_sps = max(list_speed) if list_speed else 0
-        #print(f"Maximum symbols per second achieved: {max_sps:.2f}")
+        print(f"Avg symbols per second achieved: {sum(list_speed)/len(list_speed):.2f} [symbols/s]")
 
         
